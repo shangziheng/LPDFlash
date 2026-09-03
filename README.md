@@ -1,10 +1,11 @@
 # LPDFlash
 
-**L**ow-light **P**olarization **D**enoising **Flash** — a lightweight, real-time
-polarization image restoration network for division-of-focal-plane (DoFP)
-cameras operating in real-world low-light scenarios.
+**L**ow-light **P**olarization **D**ecoupled **Flash** — a physics-guided,
+real-time framework for generalizable low-light polarization image restoration
+on division-of-focal-plane (DoFP) cameras.
 
-**Author:** Ziheng Shang
+**Authors:** Ziheng Shang, Junmeng Han, Xiaoyi Hao, Yongji Yu, Yushi Jin,
+Long Jin, and Yuan Dong
 
 ---
 
@@ -196,9 +197,9 @@ This project is released under the [MIT License](LICENSE).
 If you find LPDFlash useful, please cite:
 
 ```bibtex
-@misc{shang_lpdflash,
-  author = {Shang, Ziheng},
-  title  = {{LPDFlash}: Low-light Polarization Denoising Flash Network},
+@misc{shang2026lpdflash,
+  author = {Shang, Ziheng and Han, Junmeng and Hao, Xiaoyi and Yu, Yongji and Jin, Yushi and Jin, Long and Dong, Yuan},
+  title  = {{LPDFlash}: Physics-Guided Decoupled Learning for Real-Time, Generalizable Low-Light Polarization Image Restoration},
   year   = {2026},
   url    = {https://github.com/shangziheng/LPDFlash}
 }
