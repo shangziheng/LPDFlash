@@ -4,8 +4,7 @@
 polarization image restoration network for division-of-focal-plane (DoFP)
 cameras operating in real-world low-light scenarios.
 
-> **Note:** this repository is released under anonymous review. Author names,
-> affiliation, and funding information will be added upon publication.
+**Author:** Ziheng Shang
 
 ---
 
@@ -194,5 +193,13 @@ This project is released under the [MIT License](LICENSE).
 
 ## Citation
 
-Citation information will be added upon publication. In the meantime, please
-refer to this repository by the project name **LPDFlash**.
+If you find LPDFlash useful, please cite:
+
+```bibtex
+@misc{shang_lpdflash,
+  author = {Shang, Ziheng},
+  title  = {{LPDFlash}: Low-light Polarization Denoising Flash Network},
+  year   = {2026},
+  url    = {https://github.com/shangziheng/LPDFlash}
+}
+```
