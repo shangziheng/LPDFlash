@@ -289,7 +289,7 @@ class FSTRS(nn.Module):
 
 # ================== 下采样/上采样模块 ==================
 class Downsample(nn.Module):
-    """下采样模块 - 步长2的卷积 + 平均池化"""
+    """下采样模块 - 卷积 + 平均池化（步长2）"""
     def __init__(self, in_ch, out_ch, rep_scale=4):
         super().__init__()
         self.conv = MBRConv3(in_ch, out_ch, rep_scale=rep_scale)

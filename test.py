@@ -12,7 +12,6 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 import kornia
-import lpips
 from models.LPDFlash import LPDFlash
 
 
@@ -111,22 +110,13 @@ def compute_polarization_from_4ch(polar_gray):
 
 
 def calculate_metrics(pred_s0, pred_dolp, pred_aop, clean_s0, clean_dolp, clean_aop,
-                      noisy_s0=None, noisy_dolp=None, noisy_aop=None, lpips_model=None):
+                      noisy_s0=None, noisy_dolp=None, noisy_aop=None):
     """计算评价指标"""
     metrics = {}
-
-    # LPIPS需要的3通道版本
-    clean_s0_3ch = None
-    if lpips_model is not None:
-        clean_s0_3ch = clean_s0.repeat(1, 3, 1, 1)
 
     # S0 指标
     metrics['s0_psnr'] = kornia.metrics.psnr(pred_s0, clean_s0, max_val=1.0).item()
     metrics['s0_ssim'] = kornia.metrics.ssim(pred_s0, clean_s0, window_size=11, max_val=1.0).mean().item()
-    if lpips_model is not None:
-        # LPIPS需要3通道输入，将灰度重复为3通道
-        pred_s0_3ch = pred_s0.repeat(1, 3, 1, 1)
-        metrics['s0_lpips'] = lpips_model(pred_s0_3ch, clean_s0_3ch).item()
 
     # DoLP 指标
     metrics['dolp_psnr'] = kornia.metrics.psnr(pred_dolp, clean_dolp, max_val=1.0).item()
@@ -150,9 +140,6 @@ def calculate_metrics(pred_s0, pred_dolp, pred_aop, clean_s0, clean_dolp, clean_
     if noisy_s0 is not None:
         metrics['noisy_s0_psnr'] = kornia.metrics.psnr(noisy_s0, clean_s0, max_val=1.0).item()
         metrics['noisy_s0_ssim'] = kornia.metrics.ssim(noisy_s0, clean_s0, window_size=11, max_val=1.0).mean().item()
-        if lpips_model is not None:
-            noisy_s0_3ch = noisy_s0.repeat(1, 3, 1, 1)
-            metrics['noisy_s0_lpips'] = lpips_model(noisy_s0_3ch, clean_s0_3ch).item()
 
     if noisy_dolp is not None:
         metrics['noisy_dolp_psnr'] = kornia.metrics.psnr(noisy_dolp, clean_dolp, max_val=1.0).item()
@@ -179,7 +166,7 @@ def main():
                         help="清晰(真值)样本根目录，内含样本文件夹(0/45/90/135.bmp)或 .pt 文件")
     parser.add_argument("--noisy_root", type=str, default=None,
                         help="噪声样本根目录（文件夹模式时使用）")
-    parser.add_argument("--model_path", type=str, default="best_model_12ch_BN.pth",
+    parser.add_argument("--model_path", type=str, default="best_model.pth",
                         help="模型权重路径")
     parser.add_argument("--output_dir", type=str, default="results_test",
                         help="结果输出目录")
@@ -198,14 +185,14 @@ def main():
     IMAGE_SIZE = args.image_size
     CENTER_CROP = args.center_crop
 
-    # 亮度归一化（外部预处理，建议关闭，模型内部已有BCP）
+    # 亮度归一化（外部预处理，建议关闭，模型内部已有 IAP）
     NORMALIZE_BRIGHTNESS = False
     TARGET_BRIGHTNESS = 0.28
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"使用设备: {device}")
 
-    # 加载模型（12通道输入，启用BCP）
+    # 加载模型（12通道输入）
     print("加载模型...")
     if not os.path.exists(MODEL_PATH):
         print(f"[ERROR] 模型文件不存在: {MODEL_PATH}")
@@ -237,12 +224,6 @@ def main():
         print("[INFO] 直接使用训练版推理")
 
     model.eval()
-
-    # 初始化LPIPS模型
-    print("初始化LPIPS模型...")
-    lpips_model = lpips.LPIPS(net='alex').to(device)
-    lpips_model.eval()
-    print("[OK] LPIPS模型初始化完成")
 
     # 获取测试样本
     if not os.path.exists(CLEAN_ROOT):
@@ -280,7 +261,7 @@ def main():
                     pt_path = os.path.join(CLEAN_ROOT, item)
                     data = torch.load(pt_path, map_location=device)
                     if isinstance(data, dict):
-                        # 尝试获取12通道数据，若为7通道则转换（兼容旧数据）
+                        # 读取 12 通道数据（clean + noisy）
                         if 'noisy' in data and data['noisy'].shape[0] == 12:
                             noisy_12ch = data['noisy'].unsqueeze(0).to(device)
                             clean_12ch = data['clean'].unsqueeze(0).to(device) if 'clean' in data else noisy_12ch
@@ -307,7 +288,7 @@ def main():
                 if NORMALIZE_BRIGHTNESS:
                     noisy_12ch, _ = normalize_brightness_12ch(noisy_12ch, target_mean=TARGET_BRIGHTNESS)
 
-                # 推理（模型内部会自动处理12->7转换和BCP）
+                # 推理（模型内部自动将 12 通道拆分为 S0(3ch) 与灰度偏振(4ch)）
                 branch1_out, branch2_out = model(noisy_12ch)
                 # branch1_out: [B,3,H,W] S0彩色
                 # branch2_out: [B,4,H,W] 灰度偏振
@@ -346,7 +327,6 @@ def main():
                     pred_s0_gray, pred_dolp, pred_aop,
                     clean_s0_gray, clean_dolp, clean_aop,
                     noisy_s0_gray, noisy_dolp, noisy_aop,
-                    lpips_model=lpips_model
                 )
                 metrics['sample'] = item
                 all_metrics.append(metrics)
@@ -422,8 +402,6 @@ def main():
     if all_metrics:
         avg_metrics = {}
         base_keys = ['s0_psnr', 's0_ssim', 'dolp_psnr', 'dolp_ssim', 'aop_psnr', 'aop_ssim', 'aop_mae']
-        if 's0_lpips' in all_metrics[0]:
-            base_keys.append('s0_lpips')
         if 'dolp_mae' in all_metrics[0]:
             base_keys.append('dolp_mae')
         for key in base_keys:
@@ -431,8 +409,6 @@ def main():
 
         noisy_keys = ['noisy_s0_psnr', 'noisy_s0_ssim', 'noisy_dolp_psnr', 'noisy_dolp_ssim',
                       'noisy_aop_psnr', 'noisy_aop_ssim', 'noisy_aop_mae']
-        if 'noisy_s0_lpips' in all_metrics[0]:
-            noisy_keys.append('noisy_s0_lpips')
         if 'noisy_dolp_mae' in all_metrics[0]:
             noisy_keys.append('noisy_dolp_mae')
         for key in noisy_keys:
@@ -460,8 +436,6 @@ def main():
         print("-" * 60)
         print("【预测结果 vs 真值】")
         s0_str = f"  S0:   PSNR={avg_metrics['s0_psnr']:.2f}dB, SSIM={avg_metrics['s0_ssim']:.4f}"
-        if 's0_lpips' in avg_metrics:
-            s0_str += f", LPIPS={avg_metrics['s0_lpips']:.4f}"
         print(s0_str)
         dolp_str = f"  DoLP: PSNR={avg_metrics['dolp_psnr']:.2f}dB, SSIM={avg_metrics['dolp_ssim']:.4f}"
         if 'dolp_mae' in avg_metrics:
@@ -473,8 +447,6 @@ def main():
         if 'noisy_s0_psnr' in avg_metrics:
             print("【噪声图像 vs 真值】")
             noisy_s0_str = f"  S0:   PSNR={avg_metrics['noisy_s0_psnr']:.2f}dB, SSIM={avg_metrics['noisy_s0_ssim']:.4f}"
-            if 'noisy_s0_lpips' in avg_metrics:
-                noisy_s0_str += f", LPIPS={avg_metrics['noisy_s0_lpips']:.4f}"
             print(noisy_s0_str)
             noisy_dolp_str = f"  DoLP: PSNR={avg_metrics['noisy_dolp_psnr']:.2f}dB, SSIM={avg_metrics['noisy_dolp_ssim']:.4f}"
             if 'noisy_dolp_mae' in avg_metrics:
@@ -484,8 +456,6 @@ def main():
             print("-" * 60)
             print("【提升幅度】")
             s0_improve = f"  S0:   PSNR +{avg_metrics['s0_psnr'] - avg_metrics['noisy_s0_psnr']:.2f}dB"
-            if 's0_lpips' in avg_metrics and 'noisy_s0_lpips' in avg_metrics:
-                s0_improve += f", LPIPS {avg_metrics['noisy_s0_lpips'] - avg_metrics['s0_lpips']:+.4f}"
             print(s0_improve)
             dolp_improve = f"  DoLP: PSNR +{avg_metrics['dolp_psnr'] - avg_metrics['noisy_dolp_psnr']:.2f}dB"
             if 'dolp_mae' in avg_metrics and 'noisy_dolp_mae' in avg_metrics:

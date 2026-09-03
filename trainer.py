@@ -1,6 +1,6 @@
 """
 训练器 - 彩色偏振双分支去噪网络
-输入: 7通道 (S0彩色3通道 + 灰度偏振4通道)
+输入: 12通道 (4方向 × RGB)
 输出:
   - 分支1: S0彩色图像 [B, 3, H, W]
   - 分支2: 灰度偏振图像 [B, 4, H, W]
@@ -25,7 +25,7 @@ import numpy as np
 
 
 class BranchDataset(Dataset):
-    """单分支彩色偏振去噪数据集 - 输出12通道 (4方向 × RGB)"""
+    """彩色偏振去噪数据集 - 输出12通道 (4方向 × RGB)"""
 
     def __init__(self, clean_dir, noisy_dir, mode='train', image_size=1024, crop_size=256, stride=128,
                  normalize_brightness=False, target_brightness=0.1, use_pt=True):
@@ -396,7 +396,7 @@ class Trainer:
                  pretrained_path=None, use_pt=True, normalize_brightness=False,
                  target_brightness=0.1, freeze_branch=None,
                  train_subdir="train", val_subdir="val",
-                 save_path="best_model_12ch.pth"):
+                 save_path="best_model.pth"):
         """
         Args:
             clean_root: 清晰图像根目录（包含 train/ 和 test/ 子目录）
@@ -420,7 +420,7 @@ class Trainer:
         self.freeze_branch = freeze_branch
 
         # 创建模型（注意：模型输入通道必须为12）
-        self.model = LPDFlash().to(self.device)  # 请确保模型接受 in_channels=12
+        self.model = LPDFlash().to(self.device)  # LPDFlash 默认 use_12ch_input=True，接受 12 通道输入
         print("[INFO] 使用 LPDFlash (彩色偏振双分支去噪网络，12通道输入)")
         print("[INFO] 分支1: S0彩色图像 (3通道)")
         print("[INFO] 分支2: 灰度偏振图像 (4通道)")
@@ -659,7 +659,7 @@ def main():
                         help="训练集子目录名（默认 train）")
     parser.add_argument("--val_subdir", type=str, default="val",
                         help="验证集子目录名（默认 val）")
-    parser.add_argument("--save_path", type=str, default="best_model_12ch.pth",
+    parser.add_argument("--save_path", type=str, default="best_model.pth",
                         help="最优模型保存路径")
     args = parser.parse_args()
 

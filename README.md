@@ -42,20 +42,7 @@ real time.
 
 ## Architecture
 
-```
-                 ┌──────────────────────────────────────────────┐
-   12-ch input   │                LPDFlash                      │
-  (4 angles ×    │                                              │
-   RGB)          │   ┌─── S0 branch (multi-scale U-Net) ───┐    │
-        │        │   │   MBRConv5 → enc → bottleneck → dec │──▶ S0 (3ch)
-        ├────────┼──▶│   + FST blocks + channel attention   │    │
-        │        │   └──────────────────────────────────────┘    │
-        │        │   ┌── polar branch (multi-scale U-Net) ──┐    │
-        │        │   │   stacked FST/FSTR blocks, SiLU      │──▶ I0,I45,I90,I135 (4ch)
-        │        │   └──────────────────────────────────────┘    │
-        │        │   IAP (optional, applied to input)            │
-                 └──────────────────────────────────────────────┘
-```
+![LPDFlash architecture](assets/architecture.png)
 
 At inference time, every `MBRConv` block is fused into a single standard
 convolution (`model.slim()`), and `FST` blocks collapse to their scale-bias
@@ -80,7 +67,7 @@ A trained checkpoint (12-channel input, batch-norm reparameterization variant)
 is included:
 
 ```
-best_model_12ch_BN.pth   (≈ 23 MB)
+best_model.pth   (≈ 23 MB)
 ```
 
 ---
@@ -134,7 +121,7 @@ python trainer.py \
     --val_subdir val \
     --epochs 200 \
     --use_pt \
-    --save_path best_model_12ch.pth
+    --save_path best_model.pth
 ```
 
 Useful options:
@@ -155,13 +142,13 @@ Useful options:
 python test.py \
     --clean_root /path/to/gt/test \
     --noisy_root /path/to/noisy/test \
-    --model_path best_model_12ch_BN.pth \
+    --model_path best_model.pth \
     --output_dir results_test
 
 # .pt mode (12-channel .pt files under --clean_root)
 python test.py \
     --clean_root /path/to/pt/test \
-    --model_path best_model_12ch_BN.pth \
+    --model_path best_model.pth \
     --output_dir results_test
 ```
 
@@ -176,7 +163,6 @@ per-sample and average metrics.
 Reported on S₀, DoLP, and AoP against the clean ground truth:
 
 - **PSNR / SSIM** (S₀ and DoLP)
-- **LPIPS** (S₀, perceptual)
 - **MAE** (DoLP, AoP)
 - AoP errors are computed with periodic (modulo-π) wrapping.
 
@@ -190,7 +176,9 @@ Reported on S₀, DoLP, and AoP against the clean ground truth:
 │   └── LPDFlash.py        # MBRConv / FST / dual-branch U-Net + slim
 ├── trainer.py             # training loop, loss, dataset
 ├── test.py                # inference + evaluation
-├── best_model_12ch_BN.pth # pretrained checkpoint
+├── assets/
+│   └── architecture.png   # network framework diagram
+├── best_model.pth         # pretrained checkpoint
 ├── requirements.txt
 ├── LICENSE
 └── README.md
