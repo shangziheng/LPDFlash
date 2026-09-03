@@ -1,0 +1,24 @@
+# IDE
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# 论文/文档（不进仓库）
+*.docx
+_paper_text.txt
+_paper_meta.txt
+
+# 运行输出
+results_*/
+*.log
+
+# 模型权重：本项目权重直接提交（约 23MB）。
+# 若后续改用 Git LFS 或外链托管，取消下面注释：
+# *.pth
